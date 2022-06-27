@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "description": "A library to interact with Replit MC server (mc.repl.game)",
   "main": "dist/index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ItzDerock/replcraft.ts"
+  },
   "scripts": {
     "build": "tsc",
     "generateDocs": "typedoc --plugin typedoc-plugin-markdown --out docs src/index.ts"
