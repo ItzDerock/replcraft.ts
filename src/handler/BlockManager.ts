@@ -46,21 +46,15 @@ export class BlockManager {
      * @throws {CraftError}
      */
     set(
-        x: number,
-        y: number,
-        z: number,
-        blockData: Block,
-        source_x?: number,
-        source_y?: number,
-        source_z?: number,
-        target_x?: number,
-        target_y?: number,
-        target_z?: number
+        x: number, y: number, z: number,
+        blockData: string,
+        source_x?: number, source_y?: number, source_z?: number,
+        target_x?: number, target_y?: number, target_z?: number
     ) {
         return this.client.request({
             action: 'set_block',
             x, y, z,
-            block: blockData._data,
+            blockData,
             source_x, source_y, source_z,
             target_x, target_y, target_z
         });
