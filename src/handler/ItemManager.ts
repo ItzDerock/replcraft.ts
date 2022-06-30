@@ -29,13 +29,15 @@ export class ItemManager {
     async moveItem(
         index: number,
         source_x: number, source_y: number, source_z: number,
-        target_x: number, target_y: number, target_z: number
+        target_x: number, target_y: number, target_z: number,
+        target_index?: number, amount?: number
     ): Promise<this> {
         await this.client.request({
             action: 'move_item',
             index,
             source_x, source_y, source_z,
-            target_x, target_y, target_z
+            target_x, target_y, target_z,
+            target_index, amount
         });
 
         return this;
