@@ -1,5 +1,5 @@
 import EventEmitter from "events";
-import { Awaitable, BaseWSResponse, ClientEvents, CraftError, FuelInfo, RetryQueueEntity, TokenConfig, XYZ } from "./types";
+import { AuthenticationWSResponse, Awaitable, BaseWSResponse, ClientEvents, CraftError, FuelInfo, LoginSuccess, RetryQueueEntity, TokenConfig, XYZ } from "./types";
 import { WebSocket } from "ws";
 import { BlockManager } from "./handler/BlockManager";
 import EntityManager from "./handler/EntityManager";
@@ -7,6 +7,7 @@ import { ItemManager } from "./handler/ItemManager";
 import { Block } from "./structures/Block";
 import { Transaction, TransactionData } from "./structures/Transaction";
 import { PlayerManager } from "./handler/PlayerManager";
+import StructureContext from "./structures/StructureContext";
 
 type WSResponseHandler = (response: BaseWSResponse) => void;
 
@@ -18,12 +19,16 @@ export type ClientOptions = {
 
 export default class Client extends EventEmitter {
     /* Variables */
-    ws?: WebSocket;
     #handlers = new Map<string, WSResponseHandler>();
+    #token?: string;
+    #heartbeat?: NodeJS.Timer;
+
+    ws?: WebSocket;
     nonce: number = 0;
+
     retryFuelErrors: boolean;
     retryQueue: RetryQueueEntity[] = [];
-    #token?: string;
+
     debug: boolean;
     ready: boolean = false;
 
@@ -76,7 +81,7 @@ export default class Client extends EventEmitter {
     }
 
     /* Request Handler */
-    async request(args: any) {
+    async request<T>(args: any) {
         // wait for ws to be ready
         if(!this.ws) await this.__waitForWS();
         if(!this.ws) return Promise.reject(new CraftError("connection closed", "WS is not ready"));
@@ -93,7 +98,7 @@ export default class Client extends EventEmitter {
         this.__debug(`Sent request: ${JSON.stringify(request)}`);
 
         // wait for the response
-        return new Promise((resolve, reject) => {
+        return new Promise<T>((resolve, reject) => {
             this.#handlers.set(nonce, response => {
                 // if the response is an error, reject the promise
                 if(!response.ok) {
@@ -119,7 +124,7 @@ export default class Client extends EventEmitter {
                 }
 
                 // otherwise, resolve the promise
-                resolve(response);
+                resolve(response as unknown as T);
             });
         });
     }
@@ -204,12 +209,22 @@ export default class Client extends EventEmitter {
             // check if has a type
             if(msg.type) {
                 if(msg.type === "transact") {
-                    this.emit("transaction", new Transaction(msg as TransactionData, this));
+                    this.emit("transaction", new Transaction(msg as TransactionData, this), msg.context);
                     return;
                 }
 
                 if(msg.type === "block update") {
-                    this.emit("blockUpdate", msg.cause, new Block(msg.block, this, [msg.x, msg.y, msg.z]), msg.x, msg.y, msg.z);
+                    this.emit("blockUpdate", msg.cause, new Block(msg.block, this, [msg.x, msg.y, msg.z]), msg.context);
+                    return;
+                }
+
+                if(msg.type === "contextOpened") {
+                    this.emit("contextOpened", new StructureContext(this, msg.context), msg.cause);
+                    return;
+                }
+
+                if(msg.type === "contextClosed") {
+                    this.emit("contextClosed", msg.id, msg.cause);
                     return;
                 }
 
@@ -219,7 +234,7 @@ export default class Client extends EventEmitter {
             // or it could be an event
             if(msg.event) {
                 if(msg.event === "blockUpdate") {
-                    this.emit("blockUpdate", msg.cause, new Block(msg.block, this, [msg.x, msg.y, msg.z]), msg.x, msg.y, msg.z);
+                    this.emit("blockUpdate", msg.cause, new Block(msg.block, this, [msg.x, msg.y, msg.z]), msg.context);
                     return;
                 }
 
@@ -228,15 +243,27 @@ export default class Client extends EventEmitter {
         });
 
         // and wait for the connection to be ready
-        return new Promise<void>((resolve, reject) => {
+        return new Promise<LoginSuccess>((resolve, reject) => {
             this.ws!.once('open', () => {
-                this.request({ action: 'authenticate', token })
-                    .then(() => {
-                        resolve()
+                this.request<AuthenticationWSResponse>({ action: 'authenticate', token })
+                    .then((response) => {
+                        // start heartbeating
+                        this.#heartbeat = setInterval(() => {
+                            this.request({ action: 'heartbeat' });
+                        }, 10000);
+                        
+                        this.ws!.once('close', () => clearInterval(this.#heartbeat));
+
+                        // emit ready
                         this.emit('ready');
                         this.ready = true;
-                    })
-                    .catch(reject);
+
+                        // and resolve
+                        resolve({
+                            scope: response.scope,
+                            context: response.context ? new StructureContext(this, response.context) : null
+                        });
+                    }).catch(reject);
             });
         });
     }

@@ -1,7 +1,16 @@
 import { Block } from "./structures/Block";
+import StructureContext from "./structures/StructureContext";
 import { Transaction } from "./structures/Transaction";
 
-export type CraftErrorType = "connection closed" | "unauthenticated" | "invalid operation" | "bad request" | "out of fuel" | "offline";
+export type CraftErrorType =
+    "connection closed"
+    | "unauthenticated"
+    | "authentication failed"
+    | "invalid operation"
+    | "invalid structure"
+    | "bad request"
+    | "out of fuel"
+    | "offline";
 
 export class CraftError extends Error {
     type: CraftErrorType;
@@ -21,15 +30,29 @@ export type XYZ = [x: number, y: number, z: number];
  *   "fluid" "decay" "redstone"
  */
 export type BlockUpdateCause = "poll" | "burn" | "break" | "explode" | "fade" | "grow" | "ignite" | "piston_extend" | "piston_retract" | "place" | "fluid" | "decay" | "redstone";
+export type ContextOpenCause = "itemAttack" | "itemBreakBlock" | "itemInteractBlock" | "itemInteractAir";
 
 export interface ClientEvents {
     ready: [];
     close: [];
 
     error: [error: CraftError | Error];
-    blockUpdate: [cause: BlockUpdateCause, block: Block, x: number, y: number, z: number];
+    blockUpdate: [cause: BlockUpdateCause, block: Block, contextId: number];
     outOfFuel: [error: CraftError];
-    transaction: [transaction: Transaction];
+    transaction: [transaction: Transaction, contextId: number];
+    contextOpened: [context: StructureContext, cause: ContextOpenCause];
+    contextClosed: [contextId: number, cause: string];
+}
+
+export interface StructureContextEvents {
+    close: [];
+
+    error: [error: CraftError | Error];
+    blockUpdate: [cause: BlockUpdateCause, block: Block, contextId: number];
+    outOfFuel: [error: CraftError];
+    transaction: [transaction: Transaction, contextId: number];
+    contextOpened: [context: StructureContext, cause: ContextOpenCause];
+    contextClosed: [contextId: number, cause: string];
 }
 
 export type Awaitable<T> = T | PromiseLike<T>;
@@ -83,6 +106,11 @@ export type FuelInfoAPICost = {
     fuelCost: number;
 }
 
+export type LoginSuccess = {
+    scope: string;
+    context: StructureContext | null
+}
+
 // WS TYPES
 
 export type BaseWSResponse = {
@@ -96,3 +124,8 @@ export type BaseWSResponse = {
 export type TokenConfig = {
     host: string
 }
+
+export type AuthenticationWSResponse = {
+    scope: string;
+    context?: number;
+} & BaseWSResponse;
