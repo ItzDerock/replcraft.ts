@@ -20,7 +20,7 @@ export type XYZ = [x: number, y: number, z: number];
  *   "fade" "grow" "ignite" "piston_extend" "piston_retract" "place"
  *   "fluid" "decay" "redstone"
  */
-export type BlockUpdateCause = "poll" | "burn" | "break" | "explode" | "fade" | "grow" | "ignite" | "piston_extend" | "piston_retract" | "place" | "fluid" | "decay" | "redstone";
+export type BlockUpdateCause = "structure_grow" | "poll" | "burn" | "break" | "explode" | "fade" | "grow" | "ignite" | "piston_extend" | "piston_retract" | "place" | "fluid" | "decay" | "redstone";
 
 export interface ClientEvents {
     ready: [];
