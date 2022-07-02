@@ -18,12 +18,17 @@ export type ClientOptions = {
 
 export default class Client extends EventEmitter {
     /* Variables */
-    ws?: WebSocket;
+    #token?: string;
     #handlers = new Map<string, WSResponseHandler>();
+    #heartbeat?: NodeJS.Timer;
+
+    
+    ws?: WebSocket;
     nonce: number = 0;
+
     retryFuelErrors: boolean;
     retryQueue: RetryQueueEntity[] = [];
-    #token?: string;
+
     debug: boolean;
     ready: boolean = false;
 
@@ -232,9 +237,18 @@ export default class Client extends EventEmitter {
             this.ws!.once('open', () => {
                 this.request({ action: 'authenticate', token })
                     .then(() => {
-                        resolve()
+                        // start heartbeating
+                        this.#heartbeat = setInterval(() => {
+                            this.request({ action: 'heartbeat' });
+                        }, 10000);
+                        
+                        // on close, clear the heartbeat
+                        this.ws!.once('close', () => clearInterval(this.#heartbeat));
+
+                        // emit ready
                         this.emit('ready');
                         this.ready = true;
+                        resolve();
                     })
                     .catch(reject);
             });
